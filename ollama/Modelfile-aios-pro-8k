@@ -1,0 +1,17 @@
+# AIOS Pro — Optimized for M4 MacBook Air (16GB)
+# Updated: January 3, 2026
+# SYSTEM message provided via API, locked in KV cache via num_keep
+
+FROM mistral:instruct
+
+# LOCK FIRST 64 TOKENS IN KV CACHE (the system message from API)
+PARAMETER num_keep 64
+
+# 4K context (optimal for M4 with anchor)
+PARAMETER num_ctx 4096
+
+# Consistency
+PARAMETER temperature 0.7
+
+# NO SYSTEM DIRECTIVE - provided via API instead
+# num_keep locks the API system message in KV cache
