@@ -1,10 +1,9 @@
 // src/routes/infer.ts
-// Inference endpoint for llm-service V5
-// Updated Jan 3, 2026: Skeletal Anchor architecture for KV cache
+// Inference endpoint for llm-service V4
 
 import { Router, Request, Response } from 'express';
 import { InferRequest, InferResponse, InferStreamChunk } from '../types/index.js';
-import { callOllamaChat, callOllamaChatStream, getDefaultModel } from '../services/ollama.js';
+import { callOllama, callOllamaStream, getDefaultModel } from '../services/ollama.js';
 
 export const inferRouter = Router();
 
@@ -33,20 +32,23 @@ inferRouter.post('/infer', async (req: Request, res: Response) => {
       console.log(`[llm-service] Auto-detected model: ${targetModel}`);
     }
     
-    // Call Ollama Chat API with Skeletal Anchor architecture
-    // systemPrompt becomes rolePrompt (skeletal anchor is added internally)
-    const result = await callOllamaChat({
-      rolePrompt: body.systemPrompt || '',
-      userMessage: body.userMessage || '',
+    // Build full prompt
+    const fullPrompt = body.systemPrompt 
+      ? `${body.systemPrompt}\n\n${body.userMessage || ''}`
+      : body.userMessage;
+    
+    // Call Ollama - only pass temperature if explicitly provided
+    const result = await callOllama({
+      prompt: fullPrompt,
       model: targetModel,
       ...(body.temperature !== undefined && { temperature: body.temperature }),
       timeout: body.timeout || DEFAULT_TIMEOUT
     });
     
     const response: InferResponse = {
-      text: result.content,
-      model: targetModel,
-      tokensGenerated: Math.round(result.metrics.gen * 30), // Estimate from duration
+      text: result.response,
+      model: result.model,
+      tokensGenerated: result.eval_count,
       duration: Date.now() - startTime
     };
     
@@ -88,18 +90,22 @@ inferRouter.post('/infer/stream', async (req: Request, res: Response) => {
       console.log(`[llm-service] Auto-detected model for stream: ${targetModel}`);
     }
 
+    // Build full prompt
+    const fullPrompt = body.systemPrompt
+      ? `${body.systemPrompt}\n\n${body.userMessage || ''}`
+      : body.userMessage;
+
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    console.log(`[llm-service] Streaming inference start (model=${targetModel}, KV cache enabled)`);
+    console.log(`[llm-service] Streaming inference start (model=${targetModel})`);
 
-    // Stream from Ollama Chat API with Skeletal Anchor architecture
-    for await (const chunk of callOllamaChatStream({
-      rolePrompt: body.systemPrompt || '',
-      userMessage: body.userMessage || '',
+    // Stream from Ollama
+    for await (const chunk of callOllamaStream({
+      prompt: fullPrompt,
       model: targetModel,
       temperature: body.temperature,
       timeout: body.timeout || DEFAULT_TIMEOUT
@@ -107,8 +113,8 @@ inferRouter.post('/infer/stream', async (req: Request, res: Response) => {
       const event: InferStreamChunk = {
         token: chunk.token,
         done: chunk.done,
-        model: targetModel,
-        tokensGenerated: chunk.metrics ? Math.round(chunk.metrics.gen * 30) : undefined,
+        model: chunk.model,
+        tokensGenerated: chunk.tokensGenerated,
       };
 
       res.write(`data: ${JSON.stringify(event)}\n\n`);

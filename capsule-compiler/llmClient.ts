@@ -1,24 +1,6 @@
 import { InferRequest, InferResponse, StreamEvent } from '../types';
 import { withRetry, fetchWithTimeout } from './retryService';
 
-/**
- * LLM CLIENT - Skeletal Anchor Architecture (Jan 3, 2026)
- * 
- * IMPORTANT: The parameter name "systemPrompt" is misleading for historical reasons.
- * It actually contains ROLE INSTRUCTIONS that llm-service fuses into the USER message.
- * The actual system message sent to Ollama is SKELETAL_ANCHOR (constant, ~50 tokens).
- * 
- * Data flow:
- * 1. Extension calls callLLM(roleInstructions, capsuleData)
- * 2. This client POSTs to llm-service /infer as { systemPrompt, userMessage }
- * 3. llm-service's ollama.ts creates:
- *    - System message: SKELETAL_ANCHOR (constant, cached by Ollama)
- *    - User message: ROLE_STANCE + TURN_DATA (variable)
- * 4. Ollama caches system message, processes user message fresh
- * 
- * Performance: 87% speedup via KV cache (Turn 1: 32s, Turn 2+: 4.2s)
- */
-
 // Use 127.0.0.1 to avoid IPv6 resolution issues in Node.js 17+
 const LLM_SERVICE_URL = 'http://127.0.0.1:3456';
 

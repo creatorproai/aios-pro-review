@@ -136,29 +136,6 @@ export async function* streamLLM(
 }
 
 /**
- * Get surface content
- * Used for read → append → write pattern (multi-turn context)
- */
-export async function getSurface(
-  surfaceId: string
-): Promise<object | null> {
-  const res = await fetch(`${CAPSULE_COMPILER_URL}/surface/get`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ surfaceId })
-  });
-
-  if (!res.ok) {
-    // Return null if surface doesn't exist yet
-    if (res.status === 404) return null;
-    throw new Error(`Failed to get surface: ${res.statusText}`);
-  }
-
-  const data = await res.json() as { content: object };
-  return data.content;
-}
-
-/**
  * Update surface
  */
 export async function updateSurface(

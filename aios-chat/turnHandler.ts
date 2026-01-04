@@ -80,39 +80,20 @@ export async function* handleTurn(
     const { turnSummary, conversationalNextStep } = parseLLM3Output(llm3Result.response);
     console.log(`[Extension A] Turn summary: ${turnSummary.substring(0, 50)}...`);
 
-    // 9. Update capsule.body with turn summary (read → append → write for multi-turn context)
-    // CRITICAL: This fixes the "memory leak" - turns now accumulate instead of being replaced
-    const currentCapsule = await client.getSurface('capsule') as { body?: { recentTurns?: unknown[] } } | null;
-    const existingTurns = currentCapsule?.body?.recentTurns || [];
-
-    const newTurn = {
-      turnId,
-      userInput,
-      responsePreview: fullResponse.substring(0, 200),
-      summary: turnSummary,
-      timestamp: new Date().toISOString()
-    };
-
-    // Append new turn, keep last 5 (sliding window)
-    const updatedTurns = [...existingTurns, newTurn].slice(-5);
-
+    // 9. Update capsule.body with turn summary for multi-turn context
     await client.updateSurface('capsule', {
       body: {
-        recentTurns: updatedTurns
+        recentTurns: [{
+          turnId,
+          userInput,
+          responsePreview: fullResponse.substring(0, 200),
+          summary: turnSummary,
+          timestamp: new Date().toISOString()
+        }]
       }
     });
 
-    // 10. Update capsule.tail with session-level context
-    // Note: For Phase 1A MVP, use simple extraction from turn summary
-    await client.updateSurface('capsule', {
-      tail: {
-        goals: [], // TODO: Extract from LLM3 in future phase
-        trajectory: `Turn ${turnId}: ${turnSummary.substring(0, 100)}`,
-        pulse: 'Active'
-      }
-    });
-
-    // 11. Emit completion (AFTER all surface updates per Sage-Architect guidance)
+    // 10. Emit completion (AFTER all surface updates per Sage-Architect guidance)
     await client.emitTurnEvent('extension-a.complete');
     console.log(`[Extension A] Turn complete, emitted extension-a.complete`);
 

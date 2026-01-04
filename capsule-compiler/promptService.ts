@@ -1,32 +1,8 @@
 import * as vscode from 'vscode';
 import { LLMId, extensionContext } from '../types';
 
-/**
- * ROLE INSTRUCTION SERVICE
- * 
- * ARCHITECTURE NOTE - Skeletal Anchor System (Jan 3, 2026):
- * 
- * These are NOT system prompts in the traditional sense.
- * The actual system message sent to Ollama is SKELETAL_ANCHOR (constant, ~50 tokens).
- * 
- * What we load here are ROLE INSTRUCTIONS that llm-service
- * fuses into the USER message as the ROLE_STANCE section:
- * 
- * User message structure:
- *   # ROLE_STANCE
- *   {role instructions from this function}
- *   ---
- *   # TURN_DATA
- *   {capsule content}
- * 
- * This architecture enables KV cache optimization - the constant
- * system message is processed once and cached, while role instructions
- * and turn data vary per call.
- * 
- * Performance: Turn 1 ~32s (cold), Turn 2+ ~4s (87% faster via cache hit)
- */
-
-// Role file mapping - one per LLM
+// Prompt file mapping
+// Phase 1A: Added llm3 (Turn Encoder)
 const PROMPT_FILES: Record<LLMId, string> = {
   llm1: 'llm1-curator.md',
   llm2: 'llm2-responder.md',
